@@ -1,3 +1,4 @@
+## Support me: https://ko-fi.com/ericwkw
 
 # Sight-Reading Generator
 
