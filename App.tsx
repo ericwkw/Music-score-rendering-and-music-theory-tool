@@ -1,10 +1,16 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DEFAULT_SETTINGS } from './constants';
 import { AppSettings, GeneratorMode, Theme } from './types';
 import Controls from './components/Controls';
 import ScoreRenderer from './components/ScoreRenderer';
 import { generateMusic } from './services/geminiService';
+
+// Declaration to satisfy TypeScript in browser environment
+declare global {
+    interface Window {
+        ABCJS: any;
+    }
+}
 
 const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -19,7 +25,7 @@ const App: React.FC = () => {
   const synthRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
-
+  
   // Initial load
   useEffect(() => {
     handleGenerate();
@@ -39,7 +45,10 @@ const App: React.FC = () => {
 
   const handleGenerate = async () => {
     // Stop playback if generating
-    if (isPlaying) togglePlay();
+    if (isPlaying) {
+        if (synthRef.current) synthRef.current.stop();
+        setIsPlaying(false);
+    }
     
     setIsGenerating(true);
     const abc = await generateMusic(settings);
@@ -52,36 +61,36 @@ const App: React.FC = () => {
 
     const measures = settings.measures;
     const timeSig = settings.timeSignature;
-    let clickPattern = "";
     
-    // Define patterns based on time signature
-    // Using 'e' and 'f' in percussion clef often maps to Hi-Hat/Click
-    // %%MIDI channel 10 forces percussion
+    // Using ^F, (sharp F comma) often maps to Closed Hi Hat (42) in default soundfonts
+    // To ensure it plays in sync, we add it as a new Voice (V:Metronome) to the SAME Tune (X:1)
+    
+    let clickPattern = "";
+    const note = "^F,"; 
+
     if (timeSig === '4/4') {
-      clickPattern = "e f f f ";
+      clickPattern = `${note} ${note} ${note} ${note} | `;
     } else if (timeSig === '3/4') {
-      clickPattern = "e f f ";
+      clickPattern = `${note} ${note} ${note} | `;
     } else if (timeSig === '2/4') {
-      clickPattern = "e f ";
+      clickPattern = `${note} ${note} | `;
     } else if (timeSig === '2/2') {
-      clickPattern = "e2 f2 "; // Half notes
+      clickPattern = `${note}2 ${note}2 | `;
     } else if (timeSig === '6/8') {
-      clickPattern = "e3 f3 "; // Dotted quarters
+      clickPattern = `${note}3 ${note}3 | `;
     } else {
-      clickPattern = "e f f f "; // Fallback
+      clickPattern = `${note} ${note} ${note} ${note} | `;
     }
 
     let track = "";
     for (let i = 0; i < measures; i++) {
-        track += `| ${clickPattern}`;
+        track += clickPattern;
     }
-    track += "|";
 
+    // Append the voice to the existing ABC string
     return `${abc}
-%%%%%%%%%%%%%%%%%%%%
+V:Metronome
 %%MIDI channel 10
-X:999
-V:Metronome clef=perc
 ${track}`;
   };
 
@@ -110,11 +119,11 @@ ${track}`;
         audioContextRef.current = ac;
 
         // Prepare Audio ABC (with Metronome if enabled)
-        // We combine the visual ABC with the Metronome voice
-        // Note: We need to parse this into a separate visualObj for the synth
         const audioAbc = injectMetronome(abcNotation);
         
         // Render the Audio ABC to the hidden container to get the visualObj for the synth
+        // Passing "*" as selector usually renders nothing to DOM but returns the object, 
+        // but explicit container is safer for some ABCJS versions.
         const visualObj = window.ABCJS.renderAbc(audioContainerRef.current, audioAbc, { responsive: "resize" })[0];
 
         const synth = new window.ABCJS.synth.CreateSynth();
@@ -131,9 +140,11 @@ ${track}`;
             setIsPlaying(true);
             await synth.start();
             
-            // Reset state when finished
-            setIsPlaying(false);
-            audioContextRef.current = null;
+            // Note: ABCJS synth doesn't have a simple 'onEnded' promise that resolves exactly when audio stops.
+            // But start() resolves immediately. 
+            // We manually handle "Stop" via button, or let it finish. 
+            // For better UX, we could use a timer based on duration, but simplified toggle is safer for now.
+            
         } catch (error) {
             console.warn("Audio problem:", error);
             setIsPlaying(false);
@@ -183,6 +194,7 @@ ${track}`;
 
   return (
     <div className={`flex flex-col h-screen max-w-7xl mx-auto w-full transition-colors duration-300 ${appColors.bg}`}>
+      
       {/* Hidden container for Audio-only rendering (Metronome injection) */}
       <div ref={audioContainerRef} className="hidden"></div>
 

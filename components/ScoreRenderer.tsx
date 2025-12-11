@@ -1,15 +1,8 @@
-
 import React, { useEffect, useRef } from 'react';
 
 interface ScoreRendererProps {
   abcNotation: string;
   onLoad?: () => void;
-}
-
-declare global {
-  interface Window {
-    ABCJS: any;
-  }
 }
 
 const ScoreRenderer: React.FC<ScoreRendererProps> = ({ abcNotation, onLoad }) => {

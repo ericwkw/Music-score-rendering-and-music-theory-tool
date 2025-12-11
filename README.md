@@ -1,4 +1,3 @@
-
 ## Support me: https://ko-fi.com/ericwkw
 
 # Sight-Reading Generator
@@ -18,14 +17,14 @@ A professional music sight-reading training tool powered by Google Gemini and AB
     *   Filter by specific Major/Minor keys.
     *   Adjust probabilities for specific rhythms (e.g., 50% Quarter notes).
     *   Toggle specific techniques like Hammer-ons/Pull-offs or Staccatos.
-*   **Playback:** Instant audio playback of generated scores.
+*   **Playback:** Instant audio playback of generated scores with a synchronized metronome.
 *   **Theming:** Full support for Light and Dark modes.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-*   Node.js (v18+)
-*   A [Google Gemini API Key](https://aistudio.google.com/)
+*   A modern web browser.
+*   A [Google Gemini API Key](https://aistudio.google.com/).
 
 ### Installation
 
@@ -35,39 +34,32 @@ A professional music sight-reading training tool powered by Google Gemini and AB
     cd sight-reading-generator
     ```
 
-2.  **Install dependencies**
+2.  **Configuration**
+    Since this is a client-side application without a build step, you must configure your API key.
+    Open `index.html` and look for the `window.process` script. Replace `YOUR_API_KEY_HERE` with your actual Gemini API key.
+    
+    *Note: Never commit your real API key to a public GitHub repository.*
+
+3.  **Run the application**
+    You can serve the files using any static file server.
+    
+    Using Python:
     ```bash
-    npm install
+    python3 -m http.server 8000
+    ```
+    
+    Using npx/serve:
+    ```bash
+    npx serve .
     ```
 
-3.  **Environment Setup**
-    Create a `.env` file in the root directory and add your API key. This is required for the AI generation to work.
-    ```env
-    API_KEY=your_google_gemini_api_key_here
-    ```
-
-4.  **Run the application**
-    ```bash
-    npm start
-    # or
-    npm run dev
-    ```
+    Then open `http://localhost:8000` in your browser.
 
 ## 🛠️ Tech Stack
 
 *   **Frontend:** React 19, TypeScript, Tailwind CSS
 *   **AI Logic:** Google Gemini SDK (`@google/genai`)
-*   **Music Rendering:** ABCJS
-
-## 🤝 Contributing
-
-We welcome collaboration! Whether you want to improve the music theory prompts, add new instrument modes, or polish the UI, your contributions are valuable.
-
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+*   **Music Rendering:** ABCJS (via CDN)
 
 ## 📄 License
 
