@@ -1,22 +1,18 @@
 import React, { useEffect, useRef } from 'react';
+import abcjs from 'abcjs';
+import 'abcjs/abcjs-audio.css';
 
 interface ScoreRendererProps {
   abcNotation: string;
   onLoad?: () => void;
 }
 
-declare global {
-  interface Window {
-    ABCJS: any;
-  }
-}
-
 const ScoreRenderer: React.FC<ScoreRendererProps> = ({ abcNotation, onLoad }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.ABCJS && containerRef.current) {
-      window.ABCJS.renderAbc(containerRef.current, abcNotation, {
+    if (containerRef.current && abcNotation) {
+      abcjs.renderAbc(containerRef.current, abcNotation, {
         responsive: "resize",
         add_classes: true,
         staffwidth: 800, // Base width, scales with responsive

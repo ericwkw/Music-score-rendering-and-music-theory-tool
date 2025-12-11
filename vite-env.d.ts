@@ -1,6 +1,6 @@
-declare const process: {
-  env: {
-    [key: string]: string | undefined;
+declare namespace NodeJS {
+  interface ProcessEnv {
     API_KEY?: string;
+    [key: string]: string | undefined;
   }
-};
+}

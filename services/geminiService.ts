@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { AppSettings, GeneratorMode } from "../types";
 
@@ -19,6 +18,7 @@ Rules for ABC Notation:
 - L: (Default note length, usually 1/4 or 1/8)
 - K: (Key Signature)
 - Q: (Tempo)
+- Do NOT generate a 'V:Metronome' voice. This is handled by the application.
 - The music content must follow standard ABC syntax.
 
 Mode Specifics:

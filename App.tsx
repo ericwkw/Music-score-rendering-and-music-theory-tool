@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
+import abcjs from 'abcjs';
 import { DEFAULT_SETTINGS } from './constants';
 import { AppSettings, GeneratorMode, Theme } from './types';
 import Controls from './components/Controls';
@@ -18,8 +18,7 @@ const App: React.FC = () => {
   // Audio Refs
   const synthRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const audioContainerRef = useRef<HTMLDivElement>(null);
-
+  
   // Initial load
   useEffect(() => {
     handleGenerate();
@@ -39,7 +38,10 @@ const App: React.FC = () => {
 
   const handleGenerate = async () => {
     // Stop playback if generating
-    if (isPlaying) togglePlay();
+    if (isPlaying) {
+        if (audioContextRef.current) await audioContextRef.current.suspend();
+        setIsPlaying(false);
+    }
     
     setIsGenerating(true);
     const abc = await generateMusic(settings);
@@ -55,39 +57,40 @@ const App: React.FC = () => {
     let clickPattern = "";
     
     // Define patterns based on time signature
-    // Using 'e' and 'f' in percussion clef often maps to Hi-Hat/Click
-    // %%MIDI channel 10 forces percussion
+    // Using specific pitch for click (e.g., ^G, _G) usually maps to Hi-Hat/Click in General MIDI Drum map (Channel 10)
+    // However, abcjs synth maps notes to a default soundfont. 
+    // We will use a standard note (e.g., C) and rely on the synth to just play a tone, or map channel 10 if supported.
+    // For simplicity with standard synth, we generate a simple rhythm track.
+    
     if (timeSig === '4/4') {
-      clickPattern = "e f f f ";
+      clickPattern = "C, C, C, C, | "; // Quarter clicks
     } else if (timeSig === '3/4') {
-      clickPattern = "e f f ";
+      clickPattern = "C, C, C, | ";
     } else if (timeSig === '2/4') {
-      clickPattern = "e f ";
+      clickPattern = "C, C, | ";
     } else if (timeSig === '2/2') {
-      clickPattern = "e2 f2 "; // Half notes
+      clickPattern = "C,2 C,2 | "; // Half note clicks
     } else if (timeSig === '6/8') {
-      clickPattern = "e3 f3 "; // Dotted quarters
+      clickPattern = "C,3 C,3 | "; // Dotted quarter clicks
     } else {
-      clickPattern = "e f f f "; // Fallback
+      clickPattern = "C, C, C, C, | "; // Fallback
     }
 
     let track = "";
     for (let i = 0; i < measures; i++) {
-        track += `| ${clickPattern}`;
+        track += clickPattern;
     }
-    track += "|";
 
+    // Inject as a new voice into the SAME tune
+    // This ensures synchronization
     return `${abc}
-%%%%%%%%%%%%%%%%%%%%
+V:Metronome
 %%MIDI channel 10
-X:999
-V:Metronome clef=perc
+%%MIDI program 115
 ${track}`;
   };
 
   const togglePlay = async () => {
-    if (!window.ABCJS) return;
-
     // 1. If currently playing, PAUSE
     if (isPlaying && audioContextRef.current && audioContextRef.current.state === 'running') {
         await audioContextRef.current.suspend();
@@ -103,41 +106,40 @@ ${track}`;
     }
 
     // 3. If stopped/new, START
-    if (audioContainerRef.current) {
-        // Create new Audio Context
-        const AudioContextFunc = window.AudioContext || (window as any).webkitAudioContext;
-        const ac = new AudioContextFunc();
-        audioContextRef.current = ac;
+    // Create new Audio Context
+    const AudioContextFunc = window.AudioContext || (window as any).webkitAudioContext;
+    const ac = new AudioContextFunc();
+    audioContextRef.current = ac;
 
-        // Prepare Audio ABC (with Metronome if enabled)
-        // We combine the visual ABC with the Metronome voice
-        // Note: We need to parse this into a separate visualObj for the synth
-        const audioAbc = injectMetronome(abcNotation);
+    // Inject metronome into the ABC string to create a multi-voice tune
+    const audioAbc = injectMetronome(abcNotation);
+    
+    // We need to create a visual object for the synth to understand the structure
+    // We don't need to render this to the DOM, just parse it.
+    // However, abcjs.synth.init requires a visualObj.
+    // We can render to a detached element or use the existing visual obj if we didn't change ABC.
+    // Since we changed ABC (added metronome), we must re-parse.
+    const visualObj = abcjs.renderAbc("*", audioAbc, { responsive: "resize" })[0];
+
+    const synth = new abcjs.synth.CreateSynth();
+    synthRef.current = synth;
+
+    try {
+        await synth.init({ 
+            visualObj: visualObj, 
+            audioContext: ac, 
+            millisecondsPerMeasure: visualObj.millisecondsPerMeasure() 
+        });
+        await synth.prime();
         
-        // Render the Audio ABC to the hidden container to get the visualObj for the synth
-        const visualObj = window.ABCJS.renderAbc(audioContainerRef.current, audioAbc, { responsive: "resize" })[0];
-
-        const synth = new window.ABCJS.synth.CreateSynth();
-        synthRef.current = synth;
-
-        try {
-            await synth.init({ 
-                visualObj: visualObj, 
-                audioContext: ac, 
-                millisecondsPerMeasure: visualObj.millisecondsPerMeasure() 
-            });
-            await synth.prime();
-            
-            setIsPlaying(true);
-            await synth.start();
-            
-            // Reset state when finished
-            setIsPlaying(false);
-            audioContextRef.current = null;
-        } catch (error) {
-            console.warn("Audio problem:", error);
-            setIsPlaying(false);
-        }
+        setIsPlaying(true);
+        await synth.start();
+        
+        // Handling "End of playback" isn't directly exposed as a simple event in CreateSynth 
+        // without wrapping it in TimingCallbacks, but for now, we leave it as toggle.
+    } catch (error) {
+        console.warn("Audio problem:", error);
+        setIsPlaying(false);
     }
   };
 
@@ -183,9 +185,7 @@ ${track}`;
 
   return (
     <div className={`flex flex-col h-screen max-w-7xl mx-auto w-full transition-colors duration-300 ${appColors.bg}`}>
-      {/* Hidden container for Audio-only rendering (Metronome injection) */}
-      <div ref={audioContainerRef} className="hidden"></div>
-
+      
       {/* Header */}
       <header className="flex-none p-6 pb-2">
         <div className={`${appColors.headerBg} rounded-xl p-4 flex flex-col md:flex-row items-center justify-between border ${appColors.border} shadow-xl relative z-50`}>
