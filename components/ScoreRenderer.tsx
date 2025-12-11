@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 interface ScoreRendererProps {
@@ -15,7 +16,7 @@ const ScoreRenderer: React.FC<ScoreRendererProps> = ({ abcNotation, onLoad }) =>
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.ABCJS && containerRef.current) {
+    if (window.ABCJS && containerRef.current && abcNotation) {
       window.ABCJS.renderAbc(containerRef.current, abcNotation, {
         responsive: "resize",
         add_classes: true,
