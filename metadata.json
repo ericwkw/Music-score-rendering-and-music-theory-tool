@@ -1,0 +1,5 @@
+{
+  "name": "Sight-reading practices",
+  "description": "A professional music sight-reading generator using Gemini for content creation and ABCJS for rendering.",
+  "requestFramePermissions": []
+}
