@@ -542,17 +542,8 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
       {settings.mode === GeneratorMode.INTERVAL && renderIntervalControls()}
       {settings.mode === GeneratorMode.CHORD && renderChordControls()}
 
-      {/* ... Modals (code truncated for brevity as logic is unchanged, only Play Button below is new) ... */}
-      
-      {/* Interval Modal */}
-      <Modal 
-        isOpen={activeModal === 'interval'} 
-        onClose={() => setActiveModal('none')}
-        title="Interval Range Settings"
-        theme={theme}
-        footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveIntervalSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></>}
-      >
-         {/* ... (Interval modal content same as before) ... */}
+      {/* Modals included via same component structure */}
+      <Modal isOpen={activeModal === 'interval'} onClose={() => setActiveModal('none')} title="Interval Range Settings" theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveIntervalSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></>}>
          <div className={`mb-4 ${colors.textSub} text-sm`}><h3 className={`${colors.modalHeader} text-lg font-semibold mb-1`}>Maximum Interval Range Options</h3><p>Can only select one interval as maximum span</p></div>
         <div className="grid grid-cols-2 gap-3">
             {INTERVAL_OPTIONS.map(interval => (
@@ -566,132 +557,48 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
         </div>
       </Modal>
 
-      {/* Chord Settings Modal (Detailed) */}
-      <Modal 
-        isOpen={activeModal === 'chord'} 
-        onClose={() => setActiveModal('none')}
-        title="Chord Type Settings"
-        theme={theme}
-        footer={
+      <Modal isOpen={activeModal === 'chord'} onClose={() => setActiveModal('none')} title="Chord Type Settings" theme={theme} footer={
             <div className="w-full flex justify-between items-center">
                  <div>
-                     <button 
-                        onClick={() => setIsAdvancedChord(!isAdvancedChord)}
-                        className={`px-4 py-2 rounded-lg ${colors.elemBg} ${colors.textLabel} ${colors.elemHover} border ${colors.elemBorder} text-sm transition-colors`}
-                    >
-                        {isAdvancedChord ? 'Hide Advanced Settings' : 'Advanced Settings'}
-                    </button>
+                     <button onClick={() => setIsAdvancedChord(!isAdvancedChord)} className={`px-4 py-2 rounded-lg ${colors.elemBg} ${colors.textLabel} ${colors.elemHover} border ${colors.elemBorder} text-sm transition-colors`}>{isAdvancedChord ? 'Hide Advanced Settings' : 'Advanced Settings'}</button>
                 </div>
-                <div className="flex gap-3">
-                    <button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button>
-                    <button onClick={saveChordSettings} className="px-5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 shadow-md">Save Settings</button>
-                </div>
+                <div className="flex gap-3"><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveChordSettings} className="px-5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 shadow-md">Save Settings</button></div>
             </div>
-        }
-      >
+        }>
         {isAdvancedChord ? (
-             /* Advanced View: Voicing */
              <div className="flex flex-col gap-6">
-                <div className="flex items-center justify-between mb-2">
-                    <h3 className={`${colors.modalHeader} text-lg font-bold`}>Voicing Type Selection</h3>
-                    <button onClick={selectAllVoicings} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    {VOICING_OPTIONS.map(opt => (
-                        <div key={opt.id} onClick={() => toggleChordVoicing(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledVoicings.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}>
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledVoicings.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>
-                                {tempChordSettings.enabledVoicings.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
-                            </div>
-                            <span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span>
-                        </div>
-                    ))}
-                </div>
-                
-                <div className={`${colors.descBox} p-4 rounded-lg border ${colors.elemBorder} mt-2`}>
-                    <h4 className="text-orange-500 font-bold text-sm mb-2">Function Description:</h4>
-                    <ul className={`text-xs ${colors.textLabel} space-y-2 list-disc pl-4`}>
-                        {VOICING_OPTIONS.map(opt => (
-                            <li key={opt.id}><strong className={`${colors.textMain}`}>{opt.label.split(' Voicing')[0]}:</strong> {opt.desc}</li>
-                        ))}
-                    </ul>
-                </div>
+                <div className="flex items-center justify-between mb-2"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Voicing Type Selection</h3><button onClick={selectAllVoicings} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button></div>
+                <div className="grid grid-cols-2 gap-4">{VOICING_OPTIONS.map(opt => (<div key={opt.id} onClick={() => toggleChordVoicing(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledVoicings.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledVoicings.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>{tempChordSettings.enabledVoicings.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span></div>))}</div>
+                <div className={`${colors.descBox} p-4 rounded-lg border ${colors.elemBorder} mt-2`}><h4 className="text-orange-500 font-bold text-sm mb-2">Function Description:</h4><ul className={`text-xs ${colors.textLabel} space-y-2 list-disc pl-4`}>{VOICING_OPTIONS.map(opt => (<li key={opt.id}><strong className={`${colors.textMain}`}>{opt.label.split(' Voicing')[0]}:</strong> {opt.desc}</li>))}</ul></div>
              </div>
         ) : (
-            /* General View: Triads & Sevenths */
             <div className="flex flex-col gap-6">
-                
-                {/* Triads */}
                 <div className="flex flex-col gap-3">
-                     <div className="flex items-center justify-between">
-                        <h3 className={`${colors.modalHeader} text-lg font-bold`}>Triads</h3>
-                        <button onClick={selectAllTriads} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button>
-                    </div>
+                     <div className="flex items-center justify-between"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Triads</h3><button onClick={selectAllTriads} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button></div>
                     <div className="grid grid-cols-2 gap-3">
-                        {CHORD_TRIAD_OPTIONS.map(opt => (
-                            <div key={opt.id} onClick={() => toggleChordTriad(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledTriads.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}>
-                                <div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledTriads.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>
-                                    {tempChordSettings.enabledTriads.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
-                                </div>
-                                <span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span>
-                            </div>
-                        ))}
-                        {/* Triad Inversion Toggle */}
-                         <div onClick={() => setTempChordSettings({...tempChordSettings, triadInversions: !tempChordSettings.triadInversions})} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.triadInversions ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}>
-                                <div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.triadInversions ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>
-                                    {tempChordSettings.triadInversions && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
-                                </div>
-                                <span className={`${colors.textMain} text-sm font-medium`}>Include Inversions</span>
-                        </div>
+                        {CHORD_TRIAD_OPTIONS.map(opt => (<div key={opt.id} onClick={() => toggleChordTriad(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledTriads.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledTriads.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>{tempChordSettings.enabledTriads.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span></div>))}
+                         <div onClick={() => setTempChordSettings({...tempChordSettings, triadInversions: !tempChordSettings.triadInversions})} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.triadInversions ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.triadInversions ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>{tempChordSettings.triadInversions && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>Include Inversions</span></div>
                     </div>
                 </div>
-
-                {/* Seventh Chords */}
                  <div className="flex flex-col gap-3">
-                     <div className="flex items-center justify-between">
-                        <h3 className={`${colors.modalHeader} text-lg font-bold`}>Seventh Chords</h3>
-                        <button onClick={selectAllSevenths} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button>
-                    </div>
+                     <div className="flex items-center justify-between"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Seventh Chords</h3><button onClick={selectAllSevenths} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All</button></div>
                     <div className="grid grid-cols-2 gap-3">
-                        {CHORD_SEVENTH_OPTIONS.map(opt => (
-                            <div key={opt.id} onClick={() => toggleChordSeventh(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledSevenths.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}>
-                                <div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledSevenths.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>
-                                    {tempChordSettings.enabledSevenths.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
-                                </div>
-                                <span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span>
-                            </div>
-                        ))}
-                         {/* Seventh Inversion Toggle */}
-                         <div onClick={() => setTempChordSettings({...tempChordSettings, seventhInversions: !tempChordSettings.seventhInversions})} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.seventhInversions ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}>
-                                <div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.seventhInversions ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>
-                                    {tempChordSettings.seventhInversions && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}
-                                </div>
-                                <span className={`${colors.textMain} text-sm font-medium`}>Include Inversions</span>
-                        </div>
+                        {CHORD_SEVENTH_OPTIONS.map(opt => (<div key={opt.id} onClick={() => toggleChordSeventh(opt.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.enabledSevenths.includes(opt.id) ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.enabledSevenths.includes(opt.id) ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>{tempChordSettings.enabledSevenths.includes(opt.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{opt.label}</span></div>))}
+                         <div onClick={() => setTempChordSettings({...tempChordSettings, seventhInversions: !tempChordSettings.seventhInversions})} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempChordSettings.seventhInversions ? `${colors.modalItemSelected} border-orange-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempChordSettings.seventhInversions ? 'bg-orange-600 border-orange-600' : 'bg-white border-gray-300'}`}>{tempChordSettings.seventhInversions && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>Include Inversions</span></div>
                     </div>
                 </div>
-
             </div>
         )}
       </Modal>
 
-      {/* Key Signature Modal */}
       <Modal isOpen={activeModal === 'key'} onClose={() => setActiveModal('none')} title="Key Signature Settings" theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveKeySettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></>}>
-          {/* ... Key Content ... */}
           <div className="flex flex-col gap-8">
-            <div>
-                <div className="flex items-center justify-between mb-3"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Major</h3><button onClick={() => selectAllKeys('major')} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All Major</button></div>
-                <div className="grid grid-cols-2 gap-3">{KEY_DATA.filter(k => k.type === 'major').map(keyOption => (<div key={keyOption.id} onClick={() => toggleKey(keyOption.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempSelectedKeys.includes(keyOption.id) ? `${colors.modalItemSelected} border-blue-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempSelectedKeys.includes(keyOption.id) ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>{tempSelectedKeys.includes(keyOption.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{keyOption.label} {keyOption.acc}</span></div>))}</div>
-            </div>
-             <div>
-                <div className="flex items-center justify-between mb-3"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Minor</h3><button onClick={() => selectAllKeys('minor')} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All Minor</button></div>
-                <div className="grid grid-cols-2 gap-3">{KEY_DATA.filter(k => k.type === 'minor').map(keyOption => (<div key={keyOption.id} onClick={() => toggleKey(keyOption.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempSelectedKeys.includes(keyOption.id) ? `${colors.modalItemSelected} border-blue-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempSelectedKeys.includes(keyOption.id) ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>{tempSelectedKeys.includes(keyOption.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{keyOption.label} {keyOption.acc}</span></div>))}</div>
-            </div>
+            <div><div className="flex items-center justify-between mb-3"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Major</h3><button onClick={() => selectAllKeys('major')} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All Major</button></div><div className="grid grid-cols-2 gap-3">{KEY_DATA.filter(k => k.type === 'major').map(keyOption => (<div key={keyOption.id} onClick={() => toggleKey(keyOption.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempSelectedKeys.includes(keyOption.id) ? `${colors.modalItemSelected} border-blue-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempSelectedKeys.includes(keyOption.id) ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>{tempSelectedKeys.includes(keyOption.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{keyOption.label} {keyOption.acc}</span></div>))}</div></div>
+             <div><div className="flex items-center justify-between mb-3"><h3 className={`${colors.modalHeader} text-lg font-bold`}>Minor</h3><button onClick={() => selectAllKeys('minor')} className={`${colors.elemBg} ${colors.elemHover} ${colors.textSub} text-xs px-3 py-1.5 rounded border ${colors.elemBorder}`}>Select All Minor</button></div><div className="grid grid-cols-2 gap-3">{KEY_DATA.filter(k => k.type === 'minor').map(keyOption => (<div key={keyOption.id} onClick={() => toggleKey(keyOption.id)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempSelectedKeys.includes(keyOption.id) ? `${colors.modalItemSelected} border-blue-500` : `${colors.modalItemBg} ${colors.modalItemBorder}`}`}><div className={`w-5 h-5 rounded flex items-center justify-center border mr-3 ${tempSelectedKeys.includes(keyOption.id) ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>{tempSelectedKeys.includes(keyOption.id) && <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>}</div><span className={`${colors.textMain} text-sm font-medium`}>{keyOption.label} {keyOption.acc}</span></div>))}</div></div>
         </div>
       </Modal>
 
-      {/* Rhythm Settings Modal */}
       <Modal isOpen={activeModal === 'rhythm'} onClose={() => setActiveModal('none')} title="Rhythm Settings" theme={theme} footer={<div className="w-full flex justify-between items-center"><div><button onClick={() => setIsAdvancedRhythm(!isAdvancedRhythm)} className={`px-4 py-2 rounded-lg ${colors.elemBg} ${colors.textLabel} ${colors.elemHover} border ${colors.elemBorder} text-sm`}>{isAdvancedRhythm ? 'Basic Settings' : 'Advanced Settings'}</button></div><div className="flex gap-3"><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveRhythmSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></div></div>}>
-          {/* ... Rhythm Content ... */}
            {isAdvancedRhythm ? (
              <div className="flex flex-col gap-6">
                 <div className={`${colors.textSub} text-sm`}><h3 className={`${colors.modalHeader} text-lg font-bold mb-1`}>Advanced Frequency Settings</h3><p>Adjust the frequency of each rhythm unit (0% = not used, 100% = preferred)</p></div>
@@ -707,9 +614,7 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
         )}
       </Modal>
 
-      {/* Articulations Modal */}
       <Modal isOpen={activeModal === 'articulation'} onClose={() => setActiveModal('none')} title="Articulations" theme={theme} footer={<div className="w-full flex justify-between items-center"><div><button onClick={() => setIsAdvancedArticulation(!isAdvancedArticulation)} className={`px-4 py-2 rounded-lg ${colors.elemBg} ${colors.textLabel} ${colors.elemHover} border ${colors.elemBorder} text-sm`}>{isAdvancedArticulation ? 'Basic Settings' : 'Advanced Settings'}</button></div><div className="flex gap-3"><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveArticulationSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></div></div>}>
-          {/* ... Articulation Content ... */}
           {isAdvancedArticulation ? (
             <div className="flex flex-col gap-6">
                  <div className={`${colors.textSub} text-sm`}><h3 className={`${colors.modalHeader} text-lg font-bold mb-1`}>Advanced Frequency Settings</h3><p>Adjust frequency of each articulation (0% = not used, 100% = frequently used)</p></div>
@@ -729,7 +634,6 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
         )}
       </Modal>
 
-      {/* Piano Bass Clef Range Modal */}
       <Modal isOpen={activeModal === 'piano_bass'} onClose={() => setActiveModal('none')} title="Bass Clef Range Settings" theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={savePianoSettings} className="px-5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 shadow-md">Save Settings</button></>}>
         <div className="flex flex-col gap-4">
              <SettingsButton label="Lowest Note" value={tempPianoSettings.bassClef.min} options={NOTES} onChange={(v) => setTempPianoSettings({...tempPianoSettings, bassClef: {...tempPianoSettings.bassClef, min: v}})} />
@@ -737,7 +641,6 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
         </div>
       </Modal>
 
-      {/* Piano Treble Clef Range Modal */}
       <Modal isOpen={activeModal === 'piano_treble'} onClose={() => setActiveModal('none')} title="Treble Clef Range Settings" theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={savePianoSettings} className="px-5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 shadow-md">Save Settings</button></>}>
         <div className="flex flex-col gap-4">
              <SettingsButton label="Lowest Note" value={tempPianoSettings.trebleClef.min} options={NOTES} onChange={(v) => setTempPianoSettings({...tempPianoSettings, trebleClef: {...tempPianoSettings.trebleClef, min: v}})} />
@@ -760,7 +663,6 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
              )}
              <span>{isPlaying ? 'Pause' : 'Play'}</span>
         </button>
-        <button className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium w-12 h-12 flex items-center justify-center rounded-full border ${colors.elemBorder} transition-colors`}>👀</button>
         {settings.mode !== GeneratorMode.MELODY && (<button onClick={openRhythmModal} className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors`}>Rhythm Settings</button>)}
       </div>
 

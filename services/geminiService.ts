@@ -35,8 +35,13 @@ Strictly adhere to the Range (Lowest/Highest note), Clef, and Key provided.
 `;
 
 export const generateMusic = async (settings: AppSettings): Promise<string> => {
-  if (!process.env.API_KEY) {
-    console.warn("No API Key provided");
+  // Retrieve API Key. 
+  // Vite replaces 'process.env.API_KEY' with the build-time string.
+  // We also check window.process as a fallback for runtime injection if needed.
+  const apiKey = process.env.API_KEY || (window as any).process?.env?.API_KEY;
+
+  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+    console.warn("No valid API Key provided");
     return getDefaultAbc(settings);
   }
 
@@ -45,7 +50,7 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
   const activeKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     
     // Construct refined prompt
     let specificInstructions = "";
@@ -144,11 +149,20 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
     const jsonText = response.text;
     if (!jsonText) throw new Error("Empty response from AI");
     
-    const data = JSON.parse(jsonText);
+    // Robust JSON parsing (handles markdown code blocks)
+    let cleanJson = jsonText;
+    if (cleanJson.includes('```json')) {
+        cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '');
+    } else if (cleanJson.includes('```')) {
+        cleanJson = cleanJson.replace(/```/g, '');
+    }
+    
+    const data = JSON.parse(cleanJson);
     return data.abc;
 
   } catch (error) {
     console.error("Gemini generation failed", error);
+    // If API call fails, fallback to default generator
     return getDefaultAbc(settings);
   }
 };
@@ -178,7 +192,7 @@ const getDefaultAbc = (settings: AppSettings): string => {
 
   return `
 X:1
-T: Generated Exercise
+T: Generated Exercise (Offline Mode)
 M:${settings.timeSignature}
 L:1/4
 Q:1/4=${settings.tempo}

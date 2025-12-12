@@ -1,16 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useRef } from 'react';
+import abcjs from 'abcjs';
 import { DEFAULT_SETTINGS } from './constants';
 import { AppSettings, GeneratorMode, Theme } from './types';
 import Controls from './components/Controls';
 import ScoreRenderer from './components/ScoreRenderer';
 import { generateMusic } from './services/geminiService';
-
-// Declaration to satisfy TypeScript in browser environment
-declare global {
-    interface Window {
-        ABCJS: any;
-    }
-}
 
 const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -26,11 +21,7 @@ const App: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioContainerRef = useRef<HTMLDivElement>(null);
   
-  // Initial load
-  useEffect(() => {
-    handleGenerate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+  // NOTE: Auto-generation is disabled on mount.
 
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -95,7 +86,7 @@ ${track}`;
   };
 
   const togglePlay = async () => {
-    if (!window.ABCJS) return;
+    if (!abcNotation) return; // Don't try to play if nothing is generated
 
     // 1. If currently playing, PAUSE
     if (isPlaying && audioContextRef.current && audioContextRef.current.state === 'running') {
@@ -122,11 +113,9 @@ ${track}`;
         const audioAbc = injectMetronome(abcNotation);
         
         // Render the Audio ABC to the hidden container to get the visualObj for the synth
-        // Passing "*" as selector usually renders nothing to DOM but returns the object, 
-        // but explicit container is safer for some ABCJS versions.
-        const visualObj = window.ABCJS.renderAbc(audioContainerRef.current, audioAbc, { responsive: "resize" })[0];
+        const visualObj = abcjs.renderAbc(audioContainerRef.current, audioAbc, { responsive: "resize" })[0];
 
-        const synth = new window.ABCJS.synth.CreateSynth();
+        const synth = new abcjs.synth.CreateSynth();
         synthRef.current = synth;
 
         try {
@@ -140,10 +129,7 @@ ${track}`;
             setIsPlaying(true);
             await synth.start();
             
-            // Note: ABCJS synth doesn't have a simple 'onEnded' promise that resolves exactly when audio stops.
-            // But start() resolves immediately. 
-            // We manually handle "Stop" via button, or let it finish. 
-            // For better UX, we could use a timer based on duration, but simplified toggle is safer for now.
+            // Note: We manually handle "Stop" via button.
             
         } catch (error) {
             console.warn("Audio problem:", error);
@@ -193,14 +179,14 @@ ${track}`;
   const accentClass = getAccentColor();
 
   return (
-    <div className={`flex flex-col h-screen max-w-7xl mx-auto w-full transition-colors duration-300 ${appColors.bg}`}>
+    <div className={`flex flex-col h-screen w-full transition-colors duration-300 ${appColors.bg}`}>
       
       {/* Hidden container for Audio-only rendering (Metronome injection) */}
       <div ref={audioContainerRef} className="hidden"></div>
 
-      {/* Header */}
-      <header className="flex-none p-6 pb-2">
-        <div className={`${appColors.headerBg} rounded-xl p-4 flex flex-col md:flex-row items-center justify-between border ${appColors.border} shadow-xl relative z-50`}>
+      {/* Header - Optimized padding */}
+      <header className="flex-none p-2 md:p-4">
+        <div className={`${appColors.headerBg} rounded-xl p-3 md:p-4 flex flex-col md:flex-row items-center justify-between border ${appColors.border} shadow-xl relative z-50`}>
             
             {/* Mode Switcher acting as Dropdown/Title */}
             <div className="flex items-center gap-4">
@@ -291,11 +277,11 @@ ${track}`;
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col p-6 pt-0 overflow-y-auto">
+      {/* Main Content - Reduced padding */}
+      <main className="flex-1 flex flex-col p-4 md:p-6 pt-0 overflow-y-auto">
         
         {/* Controls Section */}
-        <section className={`${appColors.panelBg} rounded-xl p-6 border ${appColors.border} shadow-lg mb-6 transition-colors duration-300`}>
+        <section className={`${appColors.panelBg} rounded-xl p-4 md:p-6 border ${appColors.border} shadow-lg mb-4 md:mb-6 transition-colors duration-300`}>
             <Controls 
                 settings={settings} 
                 updateSetting={updateSetting} 
@@ -309,7 +295,6 @@ ${track}`;
 
         {/* Score Section */}
         <section className="flex-1 flex flex-col relative min-h-[350px]">
-             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-1 rounded-full bg-gray-400 opacity-50"></div>
              <ScoreRenderer abcNotation={abcNotation} />
         </section>
 

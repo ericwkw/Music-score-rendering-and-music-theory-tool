@@ -1,55 +1,49 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sight Reading Generator</title>
+    
+    <!-- Tailwind CSS (CDN for runtime styling) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/abcjs@6.2.2/abcjs-audio.css">
-    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.2/dist/abcjs-basic-min.js" type="text/javascript"></script>
-    <style>
-      /* Custom scrollbar to match dark theme */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {},
+        },
+        darkMode: 'class',
       }
-      ::-webkit-scrollbar-track {
-        background: #1f2937; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #4b5563; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #6b7280; 
-      }
-      .abcjs-container svg {
-        width: 100% !important;
-      }
-    </style>
+    </script>
+
+    <!-- ABCJS CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.2.2/abcjs-audio.min.css" />
+    
+    <!-- App CSS -->
+    <link rel="stylesheet" href="./index.css" />
+
+    <script>
+      // Minimal polyfill to prevent ReferenceError if code accesses process.env at runtime
+      // and Vite hasn't replaced it (though Vite config should handle API_KEY).
+      window.process = window.process || { env: {} };
+    </script>
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.1/",
-    "react/": "https://esm.sh/react@^19.2.1/"
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "vite": "https://esm.sh/vite@^7.2.7",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "abcjs": "https://esm.sh/abcjs@^6.5.2"
   }
 }
 </script>
-<script>
-  // Polyfill for process.env to allow the app to run in the browser without a bundler
-  // Users: Replace 'YOUR_API_KEY_HERE' with your actual key if running locally
-  window.process = {
-    env: {
-      API_KEY: 'YOUR_API_KEY_HERE' 
-    }
-  };
-</script>
 </head>
-  <body class="antialiased h-screen overflow-hidden bg-gray-900">
+  <body class="antialiased h-screen overflow-hidden bg-gray-900 text-white">
     <div id="root" class="h-full flex flex-col"></div>
-    <script type="module" src="./index.tsx"></script>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
