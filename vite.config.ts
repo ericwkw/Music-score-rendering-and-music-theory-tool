@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Vercel/Vite build time replacement. 
-    // This safely turns process.env.API_KEY into "actual_key_string" or "" in the built JS.
+    // Inject the API Key from the build environment (Vercel)
+    // If undefined, fallback to empty string to prevent ReferenceError in client code
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY || "")
   }
 });
