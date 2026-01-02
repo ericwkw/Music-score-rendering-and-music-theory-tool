@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { AppSettings, GeneratorMode } from "../types";
 
@@ -35,12 +34,9 @@ Strictly adhere to the Range (Lowest/Highest note), Clef, and Key provided.
 `;
 
 export const generateMusic = async (settings: AppSettings): Promise<string> => {
-  // Retrieve API Key. 
-  // Vite replaces 'process.env.API_KEY' with the build-time string.
-  // We also check window.process as a fallback for runtime injection if needed.
-  const apiKey = process.env.API_KEY || (window as any).process?.env?.API_KEY;
-
-  if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
+  // Retrieve API Key directly from process.env as per guidelines.
+  // This variable is assumed to be injected by the build system (Vite).
+  if (!process.env.API_KEY) {
     console.warn("No valid API Key provided");
     return getDefaultAbc(settings);
   }
@@ -50,7 +46,7 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
   const activeKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
 
   try {
-    const ai = new GoogleGenAI({ apiKey: apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     // Construct refined prompt
     let specificInstructions = "";
@@ -137,7 +133,7 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         responseMimeType: "application/json",

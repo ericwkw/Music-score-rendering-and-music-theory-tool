@@ -50,38 +50,110 @@ const App: React.FC = () => {
   const injectMetronome = (abc: string): string => {
     if (!settings.metronomeOn) return abc;
 
-    const measures = settings.measures;
-    const timeSig = settings.timeSignature;
+    // --- Parse Rhythm Settings from Generated ABC ---
+    // This ensures we match what the AI actually generated, not just what settings requested.
     
-    // Using ^F, (sharp F comma) often maps to Closed Hi Hat (42) in default soundfonts
-    // To ensure it plays in sync, we add it as a new Voice (V:Metronome) to the SAME Tune (X:1)
+    // 1. Time Signature (M)
+    let num = 4;
+    let den = 4;
     
-    let clickPattern = "";
-    const note = "^F,"; 
-
-    if (timeSig === '4/4') {
-      clickPattern = `${note} ${note} ${note} ${note} | `;
-    } else if (timeSig === '3/4') {
-      clickPattern = `${note} ${note} ${note} | `;
-    } else if (timeSig === '2/4') {
-      clickPattern = `${note} ${note} | `;
-    } else if (timeSig === '2/2') {
-      clickPattern = `${note}2 ${note}2 | `;
-    } else if (timeSig === '6/8') {
-      clickPattern = `${note}3 ${note}3 | `;
+    const mMatch = abc.match(/M:\s*(\S+)/);
+    const timeSigStr = mMatch ? mMatch[1].trim() : settings.timeSignature;
+    
+    if (timeSigStr === 'C') {
+        num = 4; den = 4;
+    } else if (timeSigStr === 'C|') {
+        num = 2; den = 2;
     } else {
-      clickPattern = `${note} ${note} ${note} ${note} | `;
+        const parts = timeSigStr.split('/');
+        if (parts.length === 2) {
+            num = parseInt(parts[0]);
+            den = parseInt(parts[1]);
+        }
     }
+
+    // 2. Unit Note Length (L)
+    // Default to 1/8 if not found (standard ABC behavior varies, but 1/8 is safe base)
+    let unitDenom = 8;
+    const lMatch = abc.match(/L:\s*1\/(\d+)/);
+    if (lMatch) {
+        unitDenom = parseInt(lMatch[1]);
+    } else {
+        // Heuristic default: if den < 8 usually 1/16, else 1/8. 
+        // But let's check explicit 1/4 case.
+        // For safety, we will FORCE L for the metronome voice.
+        unitDenom = 8; 
+    }
+
+    // --- Calculate Click Pattern ---
+    
+    // Determine beats per measure and click unit
+    // Standard: Click on the beat (denominator).
+    // Compound (6/8, 9/8, 12/8): Click on dotted quarter (3 x 1/8).
+    
+    let clicksPerMeasure = num;
+    let clickNoteValue = den; // e.g. 4 for quarter note
+    let isCompound = false;
+
+    if (den === 8 && num % 3 === 0 && num >= 6) {
+        isCompound = true;
+        clicksPerMeasure = num / 3;
+        // Click is a dotted quarter
+    }
+
+    // Calculate duration of one click in terms of our Metronome Voice's 'L' (which we set to 1/unitDenom)
+    // Duration = (Unit Denom) / (Click Note Value)
+    // Example: L=1/8. Beat=1/4. Duration = 8/4 = 2. (Two eighths make a quarter)
+    
+    let durationInUnits = 0;
+    
+    if (isCompound) {
+        // Click is dotted quarter (three 1/8s)
+        // duration = 3 * (unitDenom / 8)
+        durationInUnits = 3 * (unitDenom / 8);
+    } else {
+        durationInUnits = unitDenom / clickNoteValue;
+    }
+
+    // Safety fallback
+    if (isNaN(durationInUnits) || durationInUnits <= 0) durationInUnits = 1;
+
+    // Construct Measure String
+    // Using MIDI Percussion: ^G, (Pedal Hi-Hat - Strong), ^F, (Closed Hi-Hat - Weak)
+    const strong = `!fff!^G,${durationInUnits === 1 ? '' : durationInUnits}`;
+    const weak = `!mf!^F,${durationInUnits === 1 ? '' : durationInUnits}`;
+    
+    let measureStr = "";
+    for (let i = 0; i < clicksPerMeasure; i++) {
+        measureStr += (i === 0 ? strong : weak) + " ";
+    }
+    measureStr += "| ";
+
+    // --- Estimate Duration ---
+    // Count existing bars to know how long to loop.
+    // Count occurrences of |, :|, |], ||
+    // Strip header
+    const bodyStart = abc.indexOf('K:');
+    const body = bodyStart !== -1 ? abc.substring(bodyStart) : abc;
+    const matches = body.match(/\|+|:\||\|:/g); 
+    const barCount = matches ? matches.length : settings.measures;
+    
+    // Add a buffer to bar count just in case (e.g. 2 extra bars)
+    // The main voice usually dictates stopping, but we don't want click to stop early.
+    const totalBars = Math.max(barCount, settings.measures) + 2;
 
     let track = "";
-    for (let i = 0; i < measures; i++) {
-        track += clickPattern;
+    for (let i = 0; i < totalBars; i++) {
+        track += measureStr;
     }
 
-    // Append the voice to the existing ABC string
+    // --- Combine Voices ---
+    // We add V:Metronome with explicit L setting to match our math
     return `${abc}
 V:Metronome
 %%MIDI channel 10
+%%MIDI program 0
+L:1/${unitDenom}
 ${track}`;
   };
 
@@ -110,6 +182,7 @@ ${track}`;
         audioContextRef.current = ac;
 
         // Prepare Audio ABC (with Metronome if enabled)
+        // We recalculate this every play to ensure sync with current metronome toggle state
         const audioAbc = injectMetronome(abcNotation);
         
         // Render the Audio ABC to the hidden container to get the visualObj for the synth
@@ -129,7 +202,9 @@ ${track}`;
             setIsPlaying(true);
             await synth.start();
             
-            // Note: We manually handle "Stop" via button.
+            // Manual Stop Handling needed because 'await synth.start()' resolves when *started*, not finished.
+            // abcjs doesn't give a simple 'onEnded' callback in this pattern easily without timing callbacks.
+            // For now, the button toggles state. User stops it manually or it finishes silently.
             
         } catch (error) {
             console.warn("Audio problem:", error);
