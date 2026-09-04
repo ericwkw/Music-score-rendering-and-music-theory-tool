@@ -162,15 +162,19 @@ const isUsableAbc = (abc: string): boolean => {
   }
 };
 
+const IS_OPENROUTER = /(^|\.)openrouter\.ai/i.test(LLM_BASE_URL);
+
 const callLlm = async (apiKey: string, prompt: string, temperature: number): Promise<string> => {
   const res = await fetch(LLM_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      // Optional OpenRouter attribution headers; harmless for other providers.
-      ...(typeof location !== "undefined" ? { "HTTP-Referer": location.origin } : {}),
-      "X-Title": "Sight-Reading Generator",
+      // OpenRouter attribution headers only — other providers (e.g. Gemini's
+      // OpenAI-compatible endpoint) reject unknown headers at CORS preflight.
+      ...(IS_OPENROUTER && typeof location !== "undefined"
+        ? { "HTTP-Referer": location.origin, "X-Title": "Sight-Reading Generator" }
+        : {}),
     },
     body: JSON.stringify({
       model: LLM_MODEL,
