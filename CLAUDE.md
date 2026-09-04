@@ -2,10 +2,11 @@
 
 ## Project
 
-Sight-reading generator. React 18 + TypeScript + Vite, Tailwind (compiled via PostCSS), ABCJS for score rendering and audio playback, `@google/genai` for exercise generation. Runs in an offline fallback mode (`getDefaultAbc`) when no API key is set.
+Sight-reading generator. React 18 + TypeScript + Vite 7, Tailwind (compiled via PostCSS), ABCJS for score rendering and audio playback, `@google/genai` for exercise generation. Runs in an offline fallback mode (`getDefaultAbc`) when no API key is set.
 
 - API key: `API_KEY` or `VITE_API_KEY` in `.env` (see `.env.example`); injected by `vite.config.ts` via `loadEnv` as `process.env.API_KEY`.
 - `npm run build` runs `tsc --noEmit` then `vite build`. `tsconfig.json` has `strict` + `noUnusedLocals`/`noUnusedParameters`, so dead code and unused params fail the build.
+- Build stack: `vite@^7.3.6` + `@vitejs/plugin-react@^5.2.0` — these move together, plugin-react 4 does not support Vite 7+. Staying on Vite 7 (not 8) to avoid the rolldown engine for now. Vite 5.x is not an option: it has unpatched dev-server advisories.
 
 ## Gotchas
 
