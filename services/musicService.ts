@@ -1,58 +1,43 @@
-import { GoogleGenAI } from "@google/genai";
+import abcjs from "abcjs";
 import { AppSettings, GeneratorMode, ClefType } from "../types";
 import { KEY_DATA } from "../constants";
 
+// GLM-4.5-Flash via z.ai's OpenAI-compatible endpoint. Free tier, and CORS is
+// open so the browser can call it directly (same pattern as the old Gemini SDK).
+const GLM_ENDPOINT = "https://api.z.ai/api/paas/v4/chat/completions";
+const GLM_MODEL = "glm-4.5-flash";
+
 const getSystemInstruction = () => `
 You are a professional music composition engine for a sight-reading app.
-Your task is to generate valid ABC Music Notation based STRICTLY on the user's constraints.
-Output JSON format only.
+Generate valid ABC Music Notation based STRICTLY on the user's constraints.
 
-Format:
-{
-  "abc": "The full ABC notation string starting with X:1..."
-}
+Respond with a single JSON object and nothing else (no markdown, no code fences):
+{ "abc": "The full ABC notation string starting with X:1..." }
 
-Rules for ABC Notation:
-- X:1 (Reference number)
-- T: (Title - leave empty or use generic)
-- M: (Time Signature)
-- L: (Default note length, usually 1/4 or 1/8)
-- K: (Key Signature)
-- Q: (Tempo)
-- The music content must follow standard ABC syntax.
+Rules for the ABC string:
+- Header lines: X:1, T: (generic or empty), M: (time signature), L: (unit note
+  length, usually 1/8), Q: (tempo), K: (key signature). Then the music.
+- Every bar's note durations MUST sum exactly to the time signature.
+- In ABC a trailing number is a DURATION multiplier of L:, never an octave.
+  Octaves: C is middle C, c is one octave up, C, is one octave down.
+- Produce exactly the requested number of measures. End with a final barline.
+- Only diatonic notes unless the accidentals probability or the constraints call
+  for chromatics.
 
-Mode Specifics:
-- If Mode is INTERVAL: Generate intervals (two notes played together or sequentially).
-- If Mode is CHORD: Generate chords.
-  - If "Guitar Mode" is on: Use standard chords but ensure they are playable on guitar if possible (e.g., standard open or barre chord voicings).
-  - If "Piano Mode" is on: Use Grand Staff notation if requested (V:1 Treble, V:2 Bass clef).
-  - If "Staff" is hidden: The user might still want the notation for audio playback, but visually we might hide it. However, always generate standard notation.
-  - If "Chord Symbols" are requested: Add chord symbols in double quotes above the staff (e.g., "Am" [Ace]).
-- If Mode is MELODY: Generate a single line melody.
-  - If "Articulations" is enabled: Use standard ABC articulations like staccato (.) or tenuto/legato.
+Mode specifics:
+- INTERVAL: two notes together (harmonic) or in sequence (melodic).
+- CHORD: note groups in [brackets]. Guitar = playable voicings. Piano = Grand
+  Staff with V:1 (treble) and V:2 (bass). Chord symbols in double quotes before
+  the group, e.g. "Am" [Ace].
+- MELODY: a single line. Apply the requested articulations.
 
-Strictly adhere to the Range (Lowest/Highest note), Clef, and Key provided.
+Strictly adhere to the Range, Clef, Key, meter and measure count provided.
 `;
 
-export const generateMusic = async (settings: AppSettings): Promise<string> => {
-  // Retrieve API Key directly from process.env as per guidelines.
-  // This variable is assumed to be injected by the build system (Vite).
-  if (!process.env.API_KEY) {
-    console.warn("No valid API Key provided");
-    return getDefaultAbc(settings);
-  }
+const buildPrompt = (settings: AppSettings, activeKey: string): string => {
+  let specificInstructions = "";
 
-  // Pick a random key from the user's selection, fallback to 'C Major' if empty
-  const availableKeys = settings.selectedKeys.length > 0 ? settings.selectedKeys : ['C Major'];
-  const activeKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
-
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Construct refined prompt
-    let specificInstructions = "";
-    
-    if (settings.mode === GeneratorMode.CHORD) {
+  if (settings.mode === GeneratorMode.CHORD) {
         const cs = settings.chordSettings;
         const allowedTriads = cs.enabledTriads.join(', ');
         const allowedSevenths = cs.enabledSevenths.join(', ');
@@ -112,56 +97,103 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
         `;
     }
 
-    const prompt = `
+  return `
       Create a ${settings.mode} sight-reading exercise.
-      
+
       Constraints:
       - Key: ${activeKey}
       - Time Signature: ${settings.timeSignature}
       - Measures: ${settings.measures}
       - Clef: ${settings.clef}
-      ${settings.instrumentMode === 'piano' && settings.mode === GeneratorMode.CHORD 
-        ? '- Note Range: See Piano Specific Instructions for Grand Staff ranges' 
+      ${settings.instrumentMode === 'piano' && settings.mode === GeneratorMode.CHORD
+        ? '- Note Range: See Piano Specific Instructions for Grand Staff ranges'
         : `- Note Range: Lowest ${settings.lowestNote} to Highest ${settings.highestNote}`
       }
       - Accidentals Probability: ${settings.accidentalsChance}%
-      
+
       ${specificInstructions}
-      
+
       Ensure the notes fit comfortably within the staff for the chosen clef and range.
       Do not add complex ornaments unless Articulations are requested.
       If generating Chords with Chord Symbols, place the symbol in quotes before the note group, e.g., "C" [CEG].
-    `;
+  `;
+};
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        systemInstruction: getSystemInstruction(),
-        temperature: settings.functionalHarmonyMode ? 0.7 : 0.9, 
-      }
-    });
+// Pull the ABC string out of the model's JSON response (tolerating stray fences).
+const extractAbc = (raw: string): string | null => {
+  let t = (raw || "").trim();
+  if (t.includes("```")) t = t.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const brace = t.indexOf("{");
+  if (brace > 0) t = t.slice(brace);
+  try {
+    const obj = JSON.parse(t);
+    const abc = typeof obj?.abc === "string" ? obj.abc.trim() : "";
+    return abc || null;
+  } catch {
+    return null;
+  }
+};
 
-    const jsonText = response.text;
-    if (!jsonText) throw new Error("Empty response from AI");
-    
-    // Robust JSON parsing (handles markdown code blocks)
-    let cleanJson = jsonText;
-    if (cleanJson.includes('```json')) {
-        cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '');
-    } else if (cleanJson.includes('```')) {
-        cleanJson = cleanJson.replace(/```/g, '');
-    }
-    
-    const data = JSON.parse(cleanJson);
-    return data.abc;
+// Reject output that isn't parseable ABC or is missing required headers, so a
+// bad generation falls back to the offline generator instead of rendering junk.
+const isUsableAbc = (abc: string): boolean => {
+  if (!/^X:/m.test(abc) || !/^K:/m.test(abc) || !/^M:/m.test(abc)) return false;
+  try {
+    const tune = abcjs.parseOnly(abc)?.[0];
+    if (!tune || !tune.lines || tune.lines.length === 0) return false;
+    const warnings: string[] = (tune as { warnings?: string[] }).warnings ?? [];
+    // Cosmetic warnings are fine; structural parse failures are not.
+    return !warnings.some(w => /can't|cannot|not\s+understand|unexpected|invalid/i.test(w));
+  } catch {
+    return false;
+  }
+};
 
-  } catch (error) {
-    console.error("Gemini generation failed", error);
-    // If API call fails, fallback to default generator
+const callGlm = async (apiKey: string, prompt: string, temperature: number): Promise<string> => {
+  const res = await fetch(GLM_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: GLM_MODEL,
+      messages: [
+        { role: "system", content: getSystemInstruction() },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature,
+    }),
+  });
+  if (!res.ok) throw new Error(`GLM request failed: ${res.status}`);
+  const data = await res.json();
+  return data?.choices?.[0]?.message?.content ?? "";
+};
+
+export const generateMusic = async (settings: AppSettings): Promise<string> => {
+  // Injected by vite.config.ts from API_KEY / GLM_API_KEY.
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("No API key set — using the offline generator");
     return getDefaultAbc(settings);
   }
+
+  const availableKeys = settings.selectedKeys.length > 0 ? settings.selectedKeys : ['C Major'];
+  const activeKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
+  const prompt = buildPrompt(settings, activeKey);
+  const temperature = settings.functionalHarmonyMode ? 0.7 : 0.9;
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const nudge = attempt === 0 ? "" :
+        '\n\nYour previous reply was not valid ABC. Return ONLY {"abc":"..."} ' +
+        "with syntactically correct ABC whose bars sum to the meter.";
+      const abc = extractAbc(await callGlm(apiKey, prompt + nudge, temperature));
+      if (abc && isUsableAbc(abc)) return abc;
+      console.warn(`AI output failed validation (attempt ${attempt + 1})`);
+    }
+  } catch (error) {
+    console.error("AI generation failed", error);
+  }
+  return getDefaultAbc(settings);
 };
 
 // ===========================================================================

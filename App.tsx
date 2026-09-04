@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from './constants';
 import { AppSettings, GeneratorMode, Theme } from './types';
 import Controls from './components/Controls';
 import ScoreRenderer from './components/ScoreRenderer';
-import { generateMusic } from './services/geminiService';
+import { generateMusic } from './services/musicService';
 
 const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
