@@ -186,7 +186,10 @@ const callLlm = async (apiKey: string, prompt: string, temperature: number): Pro
       temperature,
     }),
   });
-  if (!res.ok) throw new Error(`LLM request failed: ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`LLM request failed: ${res.status} ${detail.slice(0, 300)}`);
+  }
   const data = await res.json();
   const msg = data?.choices?.[0]?.message;
   // Some reasoning models put the answer in `content`, thinking in `reasoning`.
