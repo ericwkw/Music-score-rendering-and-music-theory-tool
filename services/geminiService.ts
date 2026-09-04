@@ -221,10 +221,33 @@ const resolveKey = (activeKey: string) => {
 
   const abcKey =
     `${tonicLetter}${tonicAlter === 1 ? '#' : tonicAlter === -1 ? 'b' : ''}${mode === 'minor' ? 'm' : ''}`;
-  return { scale, abcKey, mode, tonicLetter, tonicIdx };
+  return { scale, abcKey, mode, tonicLetter, tonicIdx, flat: !isSharp };
 };
 
 type ResolvedKey = ReturnType<typeof resolveKey>;
+
+// Spell a chord tone as an ABC token. `rootLetter` + `genericStep` (0=root,
+// 1=2nd, 2=3rd, 4=5th, 6=7th, ...) fix the letter name, then the accidental is
+// chosen so the letter sounds `midi` — relative to the key signature, so a
+// diatonic tone needs nothing and e.g. the 3rd of a D chord always spells F#,
+// never Gb, in any key.
+const spellChordTone = (rootLetter: string, genericStep: number, midi: number, key: ResolvedKey): string => {
+  const letter = LETTERS[(LETTERS.indexOf(rootLetter) + genericStep) % 7];
+  const natural = LETTER_SEMITONE[letter];
+  const pc = ((midi % 12) + 12) % 12;
+  let alter = ((pc - natural + 6) % 12) - 6;   // nearest signed distance, -6..+5
+  if (alter < -2) alter += 12;
+  if (alter > 2) alter -= 12;
+  const keyAlter = key.scale.find(t => t.letter === letter)?.alter ?? 0;
+  const acc = keyAlter === alter ? ''
+    : alter === 2 ? '^^' : alter === 1 ? '^'
+    : alter === -2 ? '__' : alter === -1 ? '_' : '=';
+  const octave = (midi - natural - alter) / 12 - 1; // octave of this spelling
+  let s = letter;
+  if (octave >= 5) s = letter.toLowerCase() + "'".repeat(octave - 5);
+  else if (octave <= 3) s = letter + ','.repeat(4 - octave);
+  return acc + s;
+};
 
 // Map an absolute scale-degree index (0 = tonic, 7 = tonic an octave up, may be
 // negative) to a concrete pitch: midi number + ABC token.
@@ -327,6 +350,10 @@ const buildMelodyBars = (settings: AppSettings, key: ResolvedKey): string[] => {
   const arts = settings.articulations;
   const staccatoP = arts.enabledIds.includes('staccato') ? (arts.frequencies.staccato ?? 20) / 100 : 0;
   const accentP = arts.enabledIds.includes('accent') ? (arts.frequencies.accent ?? 15) / 100 : 0;
+  const acciacP = arts.enabledIds.includes('acciaccatura') ? (arts.frequencies.acciaccatura ?? 10) / 100 : 0;
+  // Hammer-on / pull-off render as a two-note slur.
+  const slurP = (arts.enabledIds.includes('hammer') || arts.enabledIds.includes('pull'))
+    ? (arts.frequencies.hammer_pull ?? 15) / 100 : 0;
   const chromP = Math.min(0.6, (settings.accidentalsChance ?? 0) / 100);
 
   const step = () => {
@@ -349,9 +376,8 @@ const buildMelodyBars = (settings: AppSettings, key: ResolvedKey): string[] => {
   for (let mi = 0; mi < measures; mi++) {
     const slots = buildRhythm(beatsPerMeasure, settings.rhythm);
     const altered = new Set<string>(); // letters carrying an explicit accidental in this bar
-    const tokens: string[] = [];
 
-    const noteToken = (dur: string, allowChromatic: boolean): string => {
+    const noteToken = (dur: string, allowChromatic: boolean, allowGrace: boolean): string => {
       step();
       const { abc } = scaleNoteAt(cur, key, baseOct);
       const toneAlter = key.scale[((cur % 7) + 7) % 7].alter;
@@ -367,20 +393,34 @@ const buildMelodyBars = (settings: AppSettings, key: ResolvedKey): string[] => {
         altered.delete(letter);
       }
       let deco = '';
+      if (allowGrace && Math.random() < acciacP) {
+        deco += `{/${scaleNoteAt(cur + rand([-1, 1]), key, baseOct).abc}}`; // acciaccatura
+      }
       if (Math.random() < accentP) deco += '!>!';
       if (Math.random() < staccatoP) deco += '.';
       return `${deco}${acc}${abc}${dur}`;
     };
 
+    const notes: Array<{ text: string; triplet: boolean }> = [];
     for (const slot of slots) {
       if (slot.triplet) {
-        const g3 = [noteToken('', false), noteToken('', false), noteToken('', false)];
-        tokens.push(`(3${g3.join('')}`);
+        const g3 = [
+          noteToken('', false, false), noteToken('', false, false), noteToken('', false, false),
+        ];
+        notes.push({ text: `(3${g3.join('')}`, triplet: true });
       } else {
-        tokens.push(noteToken(durToken(slot.beats), true));
+        notes.push({ text: noteToken(durToken(slot.beats), true, true), triplet: false });
       }
     }
-    bars.push(tokens.join(' '));
+
+    // Slur adjacent single-note pairs for hammer-on / pull-off.
+    const open = new Array(notes.length).fill(false);
+    const close = new Array(notes.length).fill(false);
+    for (let i = 0; i < notes.length - 1; i++) {
+      if (notes[i].triplet || notes[i + 1].triplet) continue;
+      if (Math.random() < slurP) { open[i] = true; close[i + 1] = true; i++; }
+    }
+    bars.push(notes.map((n, i) => `${open[i] ? '(' : ''}${n.text}${close[i] ? ')' : ''}`).join(' '));
   }
   return bars;
 };
@@ -435,69 +475,128 @@ const FUNCTIONAL_PROGRESSIONS = [
   [0, 3, 1, 4], // I  IV ii V
 ];
 
-const chordSymbol = (rootName: string, quality: string, seventh: string | null): string => {
-  if (seventh === 'halfdim') return `${rootName}m7b5`;
-  let s = rootName;
-  if (quality === 'min') s += 'm';
-  else if (quality === 'dim') s += 'dim';
-  else if (quality === 'aug') s += 'aug';
-  if (seventh === 'maj7') s += 'maj7';
-  else if (seventh === 'dom7' || seventh === 'min7') s += '7';
-  return s;
+// Chord shapes: `semi` = semitone offsets from root, `gen` = generic scale-step
+// of each tone (0 root, 1 second, 2 third, 3 fourth, 4 fifth, 6 seventh) so the
+// speller can name it correctly.
+const CHORD_SHAPE: Record<string, { semi: number[]; gen: number[] }> = {
+  maj: { semi: [0, 4, 7], gen: [0, 2, 4] },
+  min: { semi: [0, 3, 7], gen: [0, 2, 4] },
+  dim: { semi: [0, 3, 6], gen: [0, 2, 4] },
+  aug: { semi: [0, 4, 8], gen: [0, 2, 4] },
+  sus2: { semi: [0, 2, 7], gen: [0, 1, 4] },
+  sus4: { semi: [0, 5, 7], gen: [0, 3, 4] },
+};
+const SEVENTH_SEMI: Record<string, number> = { maj7: 11, min7: 10, dom7: 10, halfdim: 10, sus7: 10 };
+// Which 7ths a given triad quality can carry (random mode).
+const SEVENTHS_FOR: Record<string, string[]> = {
+  maj: ['maj7', 'dom7'],
+  min: ['min7', 'maj7'],
+  dim: ['halfdim'],
+  aug: ['maj7', 'dom7'],
+  sus2: ['sus7'],
+  sus4: ['sus7'],
+};
+const TRIAD_ID_TO_QUALITY: Record<string, string> = {
+  major: 'maj', minor: 'min', diminished: 'dim', augmented: 'aug', sus: 'sus',
 };
 
-// Returns { degrees, quality, seventh, tones(abs indices) } per measure.
-const planChords = (settings: AppSettings, key: ResolvedKey) => {
+const chordSymbol = (root: string, quality: string, seventh: string | null): string => {
+  if (seventh === 'sus7') return `${root}7sus${quality === 'sus2' ? '2' : '4'}`;
+  if (seventh === 'halfdim') return `${root}m7b5`;
+  const base =
+    quality === 'min' ? `${root}m` :
+    quality === 'dim' ? `${root}dim` :
+    quality === 'aug' ? `${root}aug` :
+    quality === 'sus2' ? `${root}sus2` :
+    quality === 'sus4' ? `${root}sus4` : root;
+  if (seventh === 'maj7') return quality === 'min' ? `${root}m(maj7)` : `${base}maj7`;
+  if (seventh === 'dom7' || seventh === 'min7') return `${base}7`;
+  return base;
+};
+
+interface ChordTone { midi: number; gen: number; }
+interface ChordPlan { rootLetter: string; rootName: string; quality: string; seventh: string | null; tones: ChordTone[]; }
+
+// One chord per measure: pitch set (close, root position) tagged with generic
+// steps, plus label parts.
+const planChords = (settings: AppSettings, key: ResolvedKey): ChordPlan[] => {
   const cs = settings.chordSettings;
   const measures = Math.max(1, settings.measures || 2);
   const triadQ = key.mode === 'minor' ? TRIAD_QUALITY_MINOR : TRIAD_QUALITY_MAJOR;
-  const useSeventh = (cs.enabledSevenths || []).length > 0;
+  const sevenths = cs.enabledSevenths || [];
+  const useSeventh = sevenths.length > 0;
+  const nameOfDegree = (d: number) => {
+    const t = key.scale[((d % 7) + 7) % 7];
+    return t.letter + (t.alter === 1 ? '#' : t.alter === -1 ? 'b' : '');
+  };
 
-  let degrees: number[];
-  if (settings.functionalHarmonyMode) {
-    const prog = rand(FUNCTIONAL_PROGRESSIONS);
-    degrees = Array.from({ length: measures }, (_, i) => prog[i % prog.length]);
-  } else {
-    const allowedQ: string[] = (cs.enabledTriads || []).map(t =>
-      t === 'major' ? 'maj' : t === 'minor' ? 'min' : t === 'diminished' ? 'dim' : t === 'augmented' ? 'aug' : 'maj');
-    const ok = [0, 1, 2, 3, 4, 5, 6].filter(d => allowedQ.includes(triadQ[d]));
-    const pool = ok.length ? ok : [0, 3, 4];
-    degrees = Array.from({ length: measures }, (_, i) => (i === 0 ? 0 : rand(pool)));
+  const progression = rand(FUNCTIONAL_PROGRESSIONS);
+  const raw: ChordPlan[] = [];
+  for (let i = 0; i < measures; i++) {
+    let quality: string;
+    let degree: number;
+    let seventh: string | null;
+
+    if (settings.functionalHarmonyMode) {
+      degree = progression[i % progression.length];
+      quality = triadQ[degree];
+      seventh = !useSeventh ? null
+        : quality === 'maj' && degree === 4 ? 'dom7'
+        : quality === 'maj' ? 'maj7'
+        : quality === 'min' ? 'min7'
+        : quality === 'dim' ? 'halfdim' : null;
+    } else {
+      const qPool = (cs.enabledTriads || []).map(t => TRIAD_ID_TO_QUALITY[t] ?? 'maj');
+      const pool = qPool.length ? qPool : ['maj', 'min'];
+      quality = i === 0 ? (pool.includes('maj') ? 'maj' : pool[0]) : rand(pool);
+      if (quality === 'sus') quality = rand(['sus2', 'sus4']);
+      degree = i === 0 ? 0 : Math.floor(Math.random() * 7);
+      // Only take a 7th the triad quality can actually carry.
+      const compat = SEVENTHS_FOR[quality] ?? ['maj7', 'dom7'];
+      const usable = sevenths.filter(s => compat.includes(s));
+      seventh = usable.length && Math.random() < 0.6 ? rand(usable) : null;
+    }
+
+    const rootMidi = scaleNoteAt(degree, key, 4).midi;
+    const shape = CHORD_SHAPE[quality] ?? CHORD_SHAPE.maj;
+    const tones: ChordTone[] = shape.semi.map((s, j) => ({ midi: rootMidi + s, gen: shape.gen[j] }));
+    if (seventh) tones.push({ midi: rootMidi + SEVENTH_SEMI[seventh], gen: 6 });
+
+    raw.push({ rootLetter: key.scale[degree].letter, rootName: nameOfDegree(degree), quality, seventh, tones });
   }
 
-  return degrees.map(d => {
-    const tone = key.scale[d];
-    const rootName = tone.letter + (tone.alter === 1 ? '#' : tone.alter === -1 ? 'b' : '');
-    const quality = triadQ[d];
-    const seventh = !useSeventh ? null
-      : quality === 'maj' && d === 4 ? 'dom7'
-      : quality === 'maj' ? 'maj7'
-      : quality === 'min' ? 'min7'
-      : quality === 'dim' ? 'halfdim'
-      : null;
-
-    let offsets = seventh ? [0, 2, 4, 6] : [0, 2, 4];
-    // shell voicing: root, 3rd, 7th only (needs a 7th)
-    if ((settings.chordSettings.enabledVoicings || []).includes('shell') && seventh) offsets = [0, 2, 6];
-
-    // inversion: move the lowest tone up an octave
-    const invAllowed = seventh ? settings.chordSettings.seventhInversions : settings.chordSettings.triadInversions;
-    let voice = offsets.map(o => d + o);
-    if (invAllowed && Math.random() < 0.5) voice = [...voice.slice(1), voice[0] + 7];
-
-    return { rootName, quality, seventh, voice };
+  // Apply voicing + inversion to each chord's pitch set.
+  return raw.map(p => {
+    let t = [...p.tones].sort((a, b) => a.midi - b.midi);
+    const hasSeventh = !!p.seventh;
+    const v = cs.enabledVoicings || [];
+    if (v.includes('shell') && t.length >= 3) {
+      t = hasSeventh ? [t[0], t[1], t[t.length - 1]] : [t[0], t[1], t[2]]; // root, 3rd, 7th (or 5th)
+    } else if (v.includes('drop3') && t.length >= 4) {
+      t[t.length - 3] = { ...t[t.length - 3], midi: t[t.length - 3].midi - 12 };
+    } else if (v.includes('drop2') && t.length >= 3) {
+      t[t.length - 2] = { ...t[t.length - 2], midi: t[t.length - 2].midi - 12 };
+    }
+    t.sort((a, b) => a.midi - b.midi);
+    const invAllowed = hasSeventh ? cs.seventhInversions : cs.triadInversions;
+    if (invAllowed && Math.random() < 0.5) {
+      t[0] = { ...t[0], midi: t[0].midi + 12 };
+      t.sort((a, b) => a.midi - b.midi);
+    }
+    return { ...p, tones: t };
   });
 };
+
+const renderChord = (ch: ChordPlan, key: ResolvedKey, octShift: number): string =>
+  ch.tones.map(tone => spellChordTone(ch.rootLetter, tone.gen, tone.midi + octShift, key)).join('');
 
 const buildChordBars = (settings: AppSettings, key: ResolvedKey): string[] => {
   const [numer, denom] = parseMeter(settings.timeSignature);
   const dur = durToken(numer * (4 / denom));
-  const baseOct = settings.clef === ClefType.BASS ? 3 : 4;
-
+  const octShift = settings.clef === ClefType.BASS ? -12 : 0;
   return planChords(settings, key).map(ch => {
     const sym = settings.showChordSymbols ? `"${chordSymbol(ch.rootName, ch.quality, ch.seventh)}"` : '';
-    const notes = ch.voice.map(a => scaleNoteAt(a, key, baseOct).abc).join('');
-    return `${sym}[${notes}]${dur}`;
+    return `${sym}[${renderChord(ch, key, octShift)}]${dur}`;
   });
 };
 
@@ -505,18 +604,22 @@ const buildPianoChordVoices = (settings: AppSettings, key: ResolvedKey): { trebl
   const [numer, denom] = parseMeter(settings.timeSignature);
   const dur = durToken(numer * (4 / denom));
   const plan = planChords(settings, key);
+  const centreOf = (a: string, b: string) => (parseSciNote(a) + parseSciNote(b)) / 2;
+  const trebleCentre = centreOf(settings.pianoSettings.trebleClef.min, settings.pianoSettings.trebleClef.max);
+  const bassCentre = centreOf(settings.pianoSettings.bassClef.min, settings.pianoSettings.bassClef.max);
 
   const treble = plan.map(ch => {
     const sym = settings.showChordSymbols ? `"${chordSymbol(ch.rootName, ch.quality, ch.seventh)}"` : '';
-    const notes = ch.voice.map(a => scaleNoteAt(a, key, 4).abc).join('');
-    return `${sym}[${notes}]${dur}`;
+    const mid = ch.tones.reduce((s, x) => s + x.midi, 0) / ch.tones.length;
+    const shift = Math.round((trebleCentre - mid) / 12) * 12; // move chord into the RH range
+    return `${sym}[${renderChord(ch, key, shift)}]${dur}`;
   }).join(' | ');
 
   const bass = plan.map(ch => {
-    const rootDeg = ch.voice[0] % 7; // fold inversion back to the chord root for the LH
-    const root = scaleNoteAt(rootDeg, key, 2).abc;
-    const fifth = scaleNoteAt(rootDeg + 4, key, 2).abc;
-    return `[${root}${fifth}]${dur}`;
+    const rootTone = ch.tones.find(x => x.gen === 0) ?? ch.tones[0];
+    const rootPc = ((rootTone.midi % 12) + 12) % 12;
+    const root = rootPc + 12 * Math.round((bassCentre - rootPc) / 12);
+    return `[${spellChordTone(ch.rootLetter, 0, root, key)}${spellChordTone(ch.rootLetter, 4, root + 7, key)}]${dur}`;
   }).join(' | ');
 
   return { treble: `${treble} |]`, bass: `${bass} |]` };

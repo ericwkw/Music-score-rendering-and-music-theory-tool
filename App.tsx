@@ -16,6 +16,10 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [theme, setTheme] = useState<Theme>('dark');
 
+  // History of generated exercises, for the Previous / Next buttons.
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyIdx, setHistoryIdx] = useState<number>(-1);
+
   // Audio Refs
   const synthRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -36,18 +40,31 @@ const App: React.FC = () => {
     handleGenerate(next);
   };
 
+  const stopPlayback = () => {
+    if (isPlaying) {
+      if (synthRef.current) synthRef.current.stop();
+      setIsPlaying(false);
+    }
+  };
+
   const handleGenerate = async (override?: AppSettings) => {
     const active = override ?? settings;
-    // Stop playback if generating
-    if (isPlaying) {
-        if (synthRef.current) synthRef.current.stop();
-        setIsPlaying(false);
-    }
+    stopPlayback();
 
     setIsGenerating(true);
     const abc = await generateMusic(active);
     setAbcNotation(abc);
+    // Truncate any "forward" history, then append.
+    setHistory(prev => [...prev.slice(0, historyIdx + 1), abc]);
+    setHistoryIdx(prev => prev + 1);
     setIsGenerating(false);
+  };
+
+  const goToHistory = (i: number) => {
+    if (i < 0 || i >= history.length) return;
+    stopPlayback();
+    setHistoryIdx(i);
+    setAbcNotation(history[i]);
   };
 
   const injectMetronome = (abc: string): string => {
@@ -380,6 +397,10 @@ ${track}`;
                 isGenerating={isGenerating}
                 onPlay={togglePlay}
                 isPlaying={isPlaying}
+                onPrev={() => goToHistory(historyIdx - 1)}
+                onNext={() => goToHistory(historyIdx + 1)}
+                canPrev={historyIdx > 0}
+                canNext={historyIdx < history.length - 1}
                 theme={theme}
             />
         </section>

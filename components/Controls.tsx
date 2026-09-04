@@ -11,10 +11,14 @@ interface ControlsProps {
   isGenerating: boolean;
   onPlay: () => void;
   isPlaying?: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+  canPrev: boolean;
+  canNext: boolean;
   theme: Theme;
 }
 
-const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate, isGenerating, onPlay, isPlaying = false, theme }) => {
+const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate, isGenerating, onPlay, isPlaying = false, onPrev, onNext, canPrev, canNext, theme }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'interval' | 'chord' | 'key' | 'rhythm' | 'articulation' | 'piano_bass' | 'piano_treble'>('none');
   
   // Temporary state for modals
@@ -329,8 +333,8 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
     <>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
          <div className="flex flex-col gap-2">
-            <label className={`text-sm ${colors.textLabel} font-medium`}>Interval Range</label>
-            <SimpleButton label="Interval Settings" onClick={openIntervalModal} />
+            <label className={`text-sm ${colors.textLabel} font-medium`}>Max Melodic Leap</label>
+            <SimpleButton label="Leap Settings" onClick={openIntervalModal} />
          </div>
          <div className="flex flex-col gap-1">
              <label className={`text-sm ${colors.textLabel} font-medium mb-1`}>Measures</label>
@@ -351,7 +355,7 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end mt-4">
           <SettingsButton label="Lowest Note" value={settings.lowestNote} options={NOTES} onChange={(v) => updateSetting('lowestNote', v)} />
           <SettingsButton label="Highest Note" value={settings.highestNote} options={NOTES} onChange={(v) => updateSetting('highestNote', v)} />
-          
+
           <div className="flex flex-col gap-2">
               <div className={`flex justify-between text-sm ${colors.textLabel} font-medium`}>
                   <span>Accidentals</span>
@@ -531,8 +535,8 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
       {settings.mode === GeneratorMode.CHORD && renderChordControls()}
 
       {/* Modals included via same component structure */}
-      <Modal isOpen={activeModal === 'interval'} onClose={() => setActiveModal('none')} title="Interval Range Settings" theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveIntervalSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></>}>
-         <div className={`mb-4 ${colors.textSub} text-sm`}><h3 className={`${colors.modalHeader} text-lg font-semibold mb-1`}>Maximum Interval Range Options</h3><p>Can only select one interval as maximum span</p></div>
+      <Modal isOpen={activeModal === 'interval'} onClose={() => setActiveModal('none')} title={settings.mode === GeneratorMode.MELODY ? 'Maximum Melodic Leap' : 'Interval Range Settings'} theme={theme} footer={<><button onClick={() => setActiveModal('none')} className={`px-5 py-2 rounded-lg ${colors.modalCancel} border ${colors.elemBorder}`}>Cancel</button><button onClick={saveIntervalSettings} className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md">Save Settings</button></>}>
+         <div className={`mb-4 ${colors.textSub} text-sm`}><h3 className={`${colors.modalHeader} text-lg font-semibold mb-1`}>{settings.mode === GeneratorMode.MELODY ? 'Largest allowed jump between consecutive notes' : 'Maximum Interval Range Options'}</h3><p>Select one interval as the maximum span</p></div>
         <div className="grid grid-cols-2 gap-3">
             {INTERVAL_OPTIONS.map(interval => (
                 <div key={interval} onClick={() => setTempMaxInterval(interval)} className={`flex items-center p-3 rounded-lg cursor-pointer border ${tempMaxInterval === interval ? 'bg-blue-600 border-blue-600' : `${colors.modalItemBg} ${colors.modalItemBorder} hover:${colors.elemBorder}`}`}>
@@ -639,8 +643,8 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
       {/* Actions Row */}
       <div className={`flex flex-wrap items-center gap-3 mt-4 border-t ${colors.elemBorder} pt-6`}>
         <button onClick={() => onGenerate()} disabled={isGenerating} className={`${themeAccent.bg} ${themeAccent.hover} text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>{isGenerating ? 'Generating...' : `Generate ${settings.mode === GeneratorMode.CHORD ? 'Chords' : settings.mode === GeneratorMode.INTERVAL ? 'Intervals' : 'Melody'}`}</button>
-        <button className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors`}>Previous</button>
-        <button className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors`}>Next</button>
+        <button onClick={onPrev} disabled={!canPrev} className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}>Previous</button>
+        <button onClick={onNext} disabled={!canNext} className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors disabled:opacity-40 disabled:cursor-not-allowed`}>Next</button>
         <button onClick={onPlay} className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors flex items-center gap-2 ${isPlaying ? 'bg-green-500/10 border-green-500 text-green-500' : ''}`}>
              {isPlaying ? (
                 // Pause Icon
