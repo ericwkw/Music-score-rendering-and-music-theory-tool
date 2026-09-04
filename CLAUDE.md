@@ -6,6 +6,7 @@ Sight-reading generator. React 18 + TypeScript + Vite 7, Tailwind (compiled via 
 
 - Provider is config-driven via `vite.config.ts` `define`: `API_KEY` (or `LLM_API_KEY` / `GLM_API_KEY`), optional `LLM_BASE_URL` (default `https://openrouter.ai/api/v1`), optional `LLM_MODEL` (default `z-ai/glm-5.2:free`). See `.env.example`. The call is client-side, so the key ships in the bundle — use a free / low-limit key.
 - z.ai's standalone free tier for the *international* platform (`api.z.ai`) was removed; the free GLM models are on OpenRouter or the China platform (`open.bigmodel.cn`). `extractAbc` strips a `<think>` preamble so reasoning models still work.
+- The Vercel deployment overrides the defaults to **Gemini's free tier**: `LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `LLM_MODEL=gemini-2.5-flash`, key in `GLM_API_KEY`. (OpenRouter free models rate-limit hard; Groq blocks browser CORS.) `HTTP-Referer`/`X-Title` are sent only when `LLM_BASE_URL` is OpenRouter — other providers reject unknown headers at CORS preflight.
 - `npm run build` runs `tsc --noEmit` then `vite build`. `tsconfig.json` has `strict` + `noUnusedLocals`/`noUnusedParameters`, so dead code and unused params fail the build.
 - Build stack: `vite@^7.3.6` + `@vitejs/plugin-react@^5.2.0` — these move together, plugin-react 4 does not support Vite 7+. Staying on Vite 7 (not 8) to avoid the rolldown engine for now. Vite 5.x is not an option: it has unpatched dev-server advisories.
 
