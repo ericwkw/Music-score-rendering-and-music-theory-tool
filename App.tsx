@@ -195,10 +195,23 @@ ${track}`;
         synthRef.current = synth;
 
         try {
-            await synth.init({ 
-                visualObj: visualObj, 
-                audioContext: ac, 
-                millisecondsPerMeasure: visualObj.millisecondsPerMeasure() 
+            await synth.init({
+                visualObj: visualObj,
+                audioContext: ac,
+                millisecondsPerMeasure: visualObj.millisecondsPerMeasure(),
+                // abcjs reads callbacks from the nested `options` object.
+                // Fires when playback reaches the end — synth.start() resolves on
+                // *start*, not finish, so without this isPlaying stays true forever.
+                options: {
+                    onEnded: () => {
+                        setIsPlaying(false);
+                        if (audioContextRef.current) {
+                            audioContextRef.current.close().catch(() => {});
+                            audioContextRef.current = null;
+                        }
+                        synthRef.current = null;
+                    },
+                },
             });
             await synth.prime();
             
