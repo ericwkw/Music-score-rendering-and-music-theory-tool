@@ -2,10 +2,13 @@ import abcjs from "abcjs";
 import { AppSettings, GeneratorMode, ClefType } from "../types";
 import { KEY_DATA } from "../constants";
 
-// GLM-4.5-Flash via z.ai's OpenAI-compatible endpoint. Free tier, and CORS is
-// open so the browser can call it directly (same pattern as the old Gemini SDK).
-const GLM_ENDPOINT = "https://api.z.ai/api/paas/v4/chat/completions";
-const GLM_MODEL = "glm-4.5-flash";
+// Provider is config-driven: any OpenAI-compatible chat-completions endpoint.
+// Defaults to OpenRouter with a free GLM model. Override with LLM_BASE_URL /
+// LLM_MODEL in .env (see .env.example). The call is client-side, so whatever
+// key you use ships in the bundle — keep it a free / low-limit key.
+const LLM_BASE_URL = (process.env.LLM_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
+const LLM_MODEL = process.env.LLM_MODEL || "z-ai/glm-5.2:free";
+const LLM_ENDPOINT = `${LLM_BASE_URL}/chat/completions`;
 
 const getSystemInstruction = () => `
 You are a professional music composition engine for a sight-reading app.
@@ -119,19 +122,29 @@ const buildPrompt = (settings: AppSettings, activeKey: string): string => {
   `;
 };
 
-// Pull the ABC string out of the model's JSON response (tolerating stray fences).
+// Pull the ABC string out of the model's reply. Tolerates code fences, a
+// <think> preamble from reasoning models, and prose around the JSON.
 const extractAbc = (raw: string): string | null => {
-  let t = (raw || "").trim();
+  let t = (raw || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
   if (t.includes("```")) t = t.replace(/```json/gi, "").replace(/```/g, "").trim();
-  const brace = t.indexOf("{");
-  if (brace > 0) t = t.slice(brace);
-  try {
-    const obj = JSON.parse(t);
-    const abc = typeof obj?.abc === "string" ? obj.abc.trim() : "";
-    return abc || null;
-  } catch {
-    return null;
+
+  const candidates: string[] = [];
+  const first = t.indexOf("{");
+  const last = t.lastIndexOf("}");
+  if (first !== -1 && last > first) candidates.push(t.slice(first, last + 1));
+  if (first !== -1) candidates.push(t.slice(first));
+  candidates.push(t);
+
+  for (const c of candidates) {
+    try {
+      const obj = JSON.parse(c);
+      const abc = typeof obj?.abc === "string" ? obj.abc.trim() : "";
+      if (abc) return abc;
+    } catch {
+      /* try the next candidate */
+    }
   }
+  return null;
 };
 
 // Reject output that isn't parseable ABC or is missing required headers, so a
@@ -149,12 +162,18 @@ const isUsableAbc = (abc: string): boolean => {
   }
 };
 
-const callGlm = async (apiKey: string, prompt: string, temperature: number): Promise<string> => {
-  const res = await fetch(GLM_ENDPOINT, {
+const callLlm = async (apiKey: string, prompt: string, temperature: number): Promise<string> => {
+  const res = await fetch(LLM_ENDPOINT, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      // Optional OpenRouter attribution headers; harmless for other providers.
+      ...(typeof location !== "undefined" ? { "HTTP-Referer": location.origin } : {}),
+      "X-Title": "Sight-Reading Generator",
+    },
     body: JSON.stringify({
-      model: GLM_MODEL,
+      model: LLM_MODEL,
       messages: [
         { role: "system", content: getSystemInstruction() },
         { role: "user", content: prompt },
@@ -163,13 +182,15 @@ const callGlm = async (apiKey: string, prompt: string, temperature: number): Pro
       temperature,
     }),
   });
-  if (!res.ok) throw new Error(`GLM request failed: ${res.status}`);
+  if (!res.ok) throw new Error(`LLM request failed: ${res.status}`);
   const data = await res.json();
-  return data?.choices?.[0]?.message?.content ?? "";
+  const msg = data?.choices?.[0]?.message;
+  // Some reasoning models put the answer in `content`, thinking in `reasoning`.
+  return msg?.content || msg?.reasoning || "";
 };
 
 export const generateMusic = async (settings: AppSettings): Promise<string> => {
-  // Injected by vite.config.ts from API_KEY / GLM_API_KEY.
+  // Injected by vite.config.ts from API_KEY / LLM_API_KEY / GLM_API_KEY.
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.warn("No API key set — using the offline generator");
@@ -186,7 +207,7 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
       const nudge = attempt === 0 ? "" :
         '\n\nYour previous reply was not valid ABC. Return ONLY {"abc":"..."} ' +
         "with syntactically correct ABC whose bars sum to the meter.";
-      const abc = extractAbc(await callGlm(apiKey, prompt + nudge, temperature));
+      const abc = extractAbc(await callLlm(apiKey, prompt + nudge, temperature));
       if (abc && isUsableAbc(abc)) return abc;
       console.warn(`AI output failed validation (attempt ${attempt + 1})`);
     }
