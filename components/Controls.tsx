@@ -267,18 +267,6 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
   const themeAccent = getThemeColor();
 
   // --- Components ---
-  const Toggle = ({ label, value, onChange }: { label: string, value: boolean, onChange: (v: boolean) => void }) => (
-    <div className="flex flex-col gap-2">
-      <span className={`text-sm ${colors.textLabel} font-medium`}>{label}</span>
-      <div 
-        onClick={() => onChange(!value)}
-        className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors ${value ? themeAccent.bg : colors.toggleOff}`}
-      >
-        <div className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform ${value ? 'translate-x-6' : ''}`}></div>
-      </div>
-    </div>
-  );
-
   const Checkbox = ({ label, value, onChange, large = false }: { label: string, value: boolean, onChange: (v: boolean) => void, large?: boolean }) => (
     <div className="flex flex-col gap-2">
         {!large && <label className={`text-sm ${colors.textLabel} font-medium`}>{label}</label>}
@@ -650,7 +638,7 @@ const Controls: React.FC<ControlsProps> = ({ settings, updateSetting, onGenerate
 
       {/* Actions Row */}
       <div className={`flex flex-wrap items-center gap-3 mt-4 border-t ${colors.elemBorder} pt-6`}>
-        <button onClick={onGenerate} disabled={isGenerating} className={`${themeAccent.bg} ${themeAccent.hover} text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>{isGenerating ? 'Generating...' : `Generate ${settings.mode === GeneratorMode.CHORD ? 'Chords' : settings.mode === GeneratorMode.INTERVAL ? 'Intervals' : 'Melody'}`}</button>
+        <button onClick={() => onGenerate()} disabled={isGenerating} className={`${themeAccent.bg} ${themeAccent.hover} text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>{isGenerating ? 'Generating...' : `Generate ${settings.mode === GeneratorMode.CHORD ? 'Chords' : settings.mode === GeneratorMode.INTERVAL ? 'Intervals' : 'Melody'}`}</button>
         <button className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors`}>Previous</button>
         <button className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors`}>Next</button>
         <button onClick={onPlay} className={`${colors.elemBg} ${colors.elemHover} ${colors.textMain} font-medium py-3 px-6 rounded-lg border ${colors.elemBorder} transition-colors flex items-center gap-2 ${isPlaying ? 'bg-green-500/10 border-green-500 text-green-500' : ''}`}>

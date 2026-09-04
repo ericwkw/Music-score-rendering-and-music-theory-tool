@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { AppSettings, GeneratorMode } from "../types";
 
-const getSystemInstruction = (mode: GeneratorMode) => `
+const getSystemInstruction = () => `
 You are a professional music composition engine for a sight-reading app.
 Your task is to generate valid ABC Music Notation based STRICTLY on the user's constraints.
 Output JSON format only.
@@ -133,11 +133,11 @@ export const generateMusic = async (settings: AppSettings): Promise<string> => {
     `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        systemInstruction: getSystemInstruction(settings.mode),
+        systemInstruction: getSystemInstruction(),
         temperature: settings.functionalHarmonyMode ? 0.7 : 0.9, 
       }
     });
