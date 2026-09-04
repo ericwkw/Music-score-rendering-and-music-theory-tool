@@ -2,7 +2,7 @@
 
 # Sight-Reading Generator
 
-A professional music sight-reading training tool powered by an LLM (GLM-4.5-Flash) and ABCJS. This application generates limitless, customizable sheet music for Melodies, Intervals, and Chords to help musicians practice effectively.
+A professional music sight-reading training tool powered by an LLM and ABCJS. This application generates limitless, customizable sheet music for Melodies, Intervals, and Chords to help musicians practice effectively.
 
 ## 🎵 Features
 
@@ -40,7 +40,7 @@ The offline generator is not as musically nuanced as the model — think of it a
 ### Prerequisites
 
 *   Node.js 18+
-*   A [z.ai API key](https://z.ai/) for GLM-4.5-Flash (optional, free tier — without it the app runs in [offline mode](#offline-mode)).
+*   An LLM API key (optional — without it the app runs in [offline mode](#offline-mode)). Defaults to [OpenRouter](https://openrouter.ai/keys) with a free GLM model; any OpenAI-compatible provider works (see `.env.example`).
 
 ### Installation
 
@@ -52,13 +52,13 @@ The offline generator is not as musically nuanced as the model — think of it a
     ```
 
 2.  **Configure the API key**
-    Copy `.env.example` to `.env` and set your key:
+    Copy `.env.example` to `.env` and set your key (and optionally `LLM_BASE_URL` / `LLM_MODEL` to change provider):
     ```bash
     cp .env.example .env
     # then edit .env:
     # API_KEY=your_key_here
     ```
-    `.env` is git-ignored. On hosted platforms (e.g. Vercel) set `API_KEY` as an environment variable instead.
+    `.env` is git-ignored. On hosted platforms (e.g. Vercel) set these as environment variables instead, then redeploy.
 
 3.  **Run**
     ```bash
@@ -71,7 +71,7 @@ The offline generator is not as musically nuanced as the model — think of it a
 ## 🛠️ Tech Stack
 
 *   **Frontend:** React 18, TypeScript, Vite 7, Tailwind CSS (compiled via PostCSS)
-*   **AI Logic:** GLM-4.5-Flash via z.ai's OpenAI-compatible API (plain `fetch`, no SDK)
+*   **AI Logic:** any OpenAI-compatible chat API (plain `fetch`, no SDK) — defaults to OpenRouter + a free GLM model
 *   **Music Rendering:** ABCJS (also used to validate model output)
 
 ## 📄 License
