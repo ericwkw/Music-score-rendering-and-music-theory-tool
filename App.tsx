@@ -28,21 +28,24 @@ const App: React.FC = () => {
   };
 
   const handleModeChange = (mode: GeneratorMode) => {
-    setSettings(prev => ({ ...prev, mode }));
+    const next = { ...settings, mode };
+    setSettings(next);
     setIsMenuOpen(false);
-    // Trigger generation on mode switch for better UX
-    setTimeout(() => handleGenerate(), 100); 
+    // Trigger generation on mode switch for better UX.
+    // Pass the updated settings explicitly — state update is async.
+    handleGenerate(next);
   };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (override?: AppSettings) => {
+    const active = override ?? settings;
     // Stop playback if generating
     if (isPlaying) {
         if (synthRef.current) synthRef.current.stop();
         setIsPlaying(false);
     }
-    
+
     setIsGenerating(true);
-    const abc = await generateMusic(settings);
+    const abc = await generateMusic(active);
     setAbcNotation(abc);
     setIsGenerating(false);
   };
@@ -192,10 +195,23 @@ ${track}`;
         synthRef.current = synth;
 
         try {
-            await synth.init({ 
-                visualObj: visualObj, 
-                audioContext: ac, 
-                millisecondsPerMeasure: visualObj.millisecondsPerMeasure() 
+            await synth.init({
+                visualObj: visualObj,
+                audioContext: ac,
+                millisecondsPerMeasure: visualObj.millisecondsPerMeasure(),
+                // abcjs reads callbacks from the nested `options` object.
+                // Fires when playback reaches the end — synth.start() resolves on
+                // *start*, not finish, so without this isPlaying stays true forever.
+                options: {
+                    onEnded: () => {
+                        setIsPlaying(false);
+                        if (audioContextRef.current) {
+                            audioContextRef.current.close().catch(() => {});
+                            audioContextRef.current = null;
+                        }
+                        synthRef.current = null;
+                    },
+                },
             });
             await synth.prime();
             

@@ -10,7 +10,7 @@ A professional music sight-reading training tool powered by Google Gemini and AB
     *   **Melody:** Single-line generation with granular control over rhythm frequencies and articulations.
     *   **Interval:** Harmonic or melodic intervals with specific range constraints.
     *   **Chord:** Generate Triads and 7ths with inversions. Includes specific voicing strategies (Close, Drop 2, Shell, etc.).
-*   **Instrument Modes:** 
+*   **Instrument Modes:**
     *   **Piano:** Generates Grand Staff notation with split ranges for Bass and Treble clefs.
     *   **Guitar:** Optimizes harmony for guitar-friendly voicings.
 *   **Deep Customization:**
@@ -23,43 +23,41 @@ A professional music sight-reading training tool powered by Google Gemini and AB
 ## 🚀 Getting Started
 
 ### Prerequisites
-*   A modern web browser.
-*   A [Google Gemini API Key](https://aistudio.google.com/).
+
+*   Node.js 18+
+*   A [Google Gemini API Key](https://aistudio.google.com/) (optional — without it the app runs in an offline fallback mode that generates simple exercises locally).
 
 ### Installation
 
-1.  **Clone the repository**
+1.  **Clone and install**
     ```bash
     git clone https://github.com/yourusername/sight-reading-generator.git
     cd sight-reading-generator
+    npm install
     ```
 
-2.  **Configuration**
-    Since this is a client-side application without a build step, you must configure your API key.
-    Open `index.html` and look for the `window.process` script. Replace `YOUR_API_KEY_HERE` with your actual Gemini API key.
-    
-    *Note: Never commit your real API key to a public GitHub repository.*
-
-3.  **Run the application**
-    You can serve the files using any static file server.
-    
-    Using Python:
+2.  **Configure the API key**
+    Copy `.env.example` to `.env` and set your key:
     ```bash
-    python3 -m http.server 8000
+    cp .env.example .env
+    # then edit .env:
+    # API_KEY=your_key_here
     ```
-    
-    Using npx/serve:
-    ```bash
-    npx serve .
-    ```
+    `.env` is git-ignored. On hosted platforms (e.g. Vercel) set `API_KEY` as an environment variable instead.
 
-    Then open `http://localhost:8000` in your browser.
+3.  **Run**
+    ```bash
+    npm run dev       # start the dev server
+    npm run build     # typecheck + production build to dist/
+    npm run preview   # preview the production build
+    npm run typecheck # type-check only
+    ```
 
 ## 🛠️ Tech Stack
 
-*   **Frontend:** React 19, TypeScript, Tailwind CSS
+*   **Frontend:** React 18, TypeScript, Vite, Tailwind CSS (compiled via PostCSS)
 *   **AI Logic:** Google Gemini SDK (`@google/genai`)
-*   **Music Rendering:** ABCJS (via CDN)
+*   **Music Rendering:** ABCJS
 
 ## 📄 License
 
